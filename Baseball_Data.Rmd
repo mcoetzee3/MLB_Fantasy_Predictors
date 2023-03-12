@@ -1,0 +1,232 @@
+---
+title: "Untitled"
+author: "Brooks Coetzee III"
+date: "2022-09-21"
+output: html_document
+---
+
+```{r}
+### Packages
+
+library(httr) # httr is organised around the six most common http verbs: GET(), PATCH(), POST(), HEAD(), PUT(), and DELETE().
+library(rvest) # Easily Harvest (Scrape) Web Pages
+library(tidyverse)
+library(jsonlite)  ## These functions are used to convert between JSON data and R objects.
+library(lubridate)  ## Lubridate provides tools that make it easier to parse and manipulate dates.
+library(readxl)
+library(ggplot2)
+library(xgboost)
+library(randomForest)
+```
+Definition of variables
+*FPTS: Total Fantansy for that season
+*FPPG: Fantasy Points per game
+*GP: Games Played
+*TPA: Total Plate Appearances
+*AB: At bats
+*R: Runs
+*H: Hits
+*1B,2B,3B: Singles, Doubles, Triples
+*HR: Homeruns
+*RBI: Runs Batted In
+*AVG: Batting Average
+*OBP: On Base Percentage
+*SLG: Slugging
+*OPS: One base plus slugging
+*BB: Walks
+*SO: Strike Outs
+*TB: Total Bases
+*SB: Stolen Bases
+*CS: Caught Stealing
+*HBP: Hit By Pitch
+*SH: Sac Hit
+*SF: Sac Fly
+*E: Error
+*A: Assists
+*GDP: Grounded into Double Play
+
+
+2021 Season Stats
+```{r}
+baseball_2021 <- read_excel('Baseball_Data_2021.xlsx')
+summary(baseball_2021)
+head(baseball_2021)
+tail(baseball_2021)
+
+sum(is.na(baseball_2021))
+#0 NA values
+```
+Density Plots:
+```{r}
+# Create plot
+g_1 <- ggplot(baseball_2021, aes(x = FPTS)) + # Set X-axis as insurance charges
+  geom_density(fill = "blue", alpha = 0.3) + # Use geom_density to get density plot
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(x = "FPTS", # Set plot labels
+       title = "Density of FPTS")
+
+g_1 # Generate plot
+
+#Great density in the 400 for PTS on the year
+```
+relation between FPPG and AVG
+```{r}
+g_3 <- ggplot(baseball_2021, # Set dataset 
+              aes(y = FPPG, # Set y-axis as insurance charges 
+                  x = AVG)) + # Set x-axis as age.
+  geom_point(color = "blue", alpha = 0.3) + # Use geom_point to get scatter plot
+  geom_smooth(method = "lm") + # Add smoothing line
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(y = "FPPG", # Set plot labels
+       x = "AVG",
+       title = "FPPG and AVG")
+
+g_3
+
+#There is a positive correlation with a wide standard error. this shows that there is a correlation between AVG and fantasy points per game.
+```
+
+
+2022 Season
+```{r}
+#as of September 20, 2022
+baseball_2022 <- read_excel('Baseball_Data_2022_Updated.xlsx')
+summary(baseball_2022)
+head(baseball_2022)
+tail(baseball_2022)
+sum(is.na(baseball_2022))
+#0 NA values
+```
+Density Plot:
+```{r}
+g_2 <- ggplot(baseball_2022, aes(x = FPTS)) + # Set X-axis as insurance charges
+  geom_density(fill = "blue", alpha = 0.3) + # Use geom_density to get density plot
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(x = "FPTS", # Set plot labels
+       title = "Density of FPTS")
+
+g_2 # Generate plot
+
+#Great density in the 400 for PTS on the year
+#Lower scoreres overall and lower number of players over 600 points compared to the previous year.
+```
+relation between FPPG and AVG:
+```{r}
+g_4 <- ggplot(baseball_2022, # Set dataset 
+              aes(y = FPPG, # Set y-axis as insurance charges 
+                  x = AVG)) + # Set x-axis as age.
+  geom_point(color = "blue", alpha = 0.3) + # Use geom_point to get scatter plot
+  geom_smooth(method = "lm") + # Add smoothing line
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(y = "FPPG", # Set plot labels
+       x = "AVG",
+       title = "FPPG and AVG")
+
+g_4
+
+#There is a positive correlation with a wide standard error. this shows that there is a correlation between AVG and fantasy points per game.
+# Like the previous graph there is a lower correlation between the two variables than the previous year.
+```
+To conclude from our initial findings, The most broad offensive statistic has a correlation to fantasy points. However it is a slight positive relation. Our goal of this project is to see if we can predict what stats causes the player to set them apart from the rest of the players. 
+--------------------------------------------------------------------------------
+
+# Lag points
+
+```{r}
+head(baseball_2021)
+head(baseball_2022)
+
+points_2022 <- rep(NA, nrow(baseball_2021))
+for(i  in 1:nrow(baseball_2021)){
+  if(baseball_2021$PLAYER[i] %in% baseball_2022$PLAYER){
+    points_2022[i] <- baseball_2022$FPTS[which(baseball_2022$PLAYER == baseball_2021$PLAYER[i])]
+  }
+}
+
+points_2022
+
+baseball_2021$point_2022 <- points_2022
+
+baseball_lagged <- na.omit(baseball_2021)
+
+baseball_lagged[baseball_lagged == "—"] <- "0"
+baseball_lagged <- as.data.frame(baseball_lagged)
+for(i in 2:ncol(baseball_lagged)){
+  baseball_lagged[,i] <- as.numeric(baseball_lagged[,i])
+}
+
+summary(baseball_lagged)
+```
+53 players present in both data sets
+
+
+
+
+Analysis of 2022 to 2021
+# Initial Regression model:
+```{r}
+#Total Fantasy Points with Significant Predictors
+noplayer_2021 <- baseball_lagged[,-c(1)]
+model_2021 <- lm(point_2022 ~ SO + AVG + OPS + SLG + R + H + TB + GP + HR + FPTS ,data = noplayer_2021)
+summary(model_2021)
+
+all <- lm(point_2022 ~ ., data = noplayer_2021)
+
+summary(all)
+
+```
+# Visuals
+
+XGboost
+```{r}
+set.seed(111111)
+test_index <- sample(1:nrow(baseball_lagged), nrow(baseball_lagged) * 0.2)
+
+dtrain <- xgb.DMatrix(data = as.matrix(baseball_lagged[-test_index,c("SO", "AVG", "OPS", "SLG",
+                                                                      "R", "H",  "TB", "GP", "HR",
+                                                                      "FPTS")]), label = as.numeric(baseball_lagged$point_2022[-test_index]))
+# Create test matrix
+dtest <- xgb.DMatrix(data = as.matrix(baseball_lagged[test_index,c("SO", "AVG", "OPS", "SLG",
+                                                                      "R", "H",  "TB", "GP", "HR",
+                                                                      "FPTS")]), label = as.numeric(baseball_lagged$point_2022[test_index]))
+
+
+bst_1 <- xgboost(data = dtrain, # Set training data
+
+               
+
+               nrounds = 100, # Set number of rounds
+
+               
+
+               verbose = 1, # 1 - Prints out fit
+
+                print_every_n = 20# Prints out result every 20th iteration
+
+ )
+
+```
+```{r}
+# Extract importance
+imp_mat <- xgb.importance(model = bst_1)
+# Plot importance (top 10 variables)
+xgb.plot.importance(imp_mat, top_n = 10)
+```
+
+
